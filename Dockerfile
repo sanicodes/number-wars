@@ -1,33 +1,29 @@
+# syntax=docker/dockerfile:1
+
 # Build stage
 FROM node:18-alpine as builder
 
-# Create necessary directories
-RUN mkdir -p /app/client /app/server
+WORKDIR /app
 
-# Set up client build
+# Copy root package files
+COPY package*.json ./
+
+# Copy client files
+COPY client client/
+
+# Build client
 WORKDIR /app/client
-
-# Copy entire client directory
-COPY client/ ./
-
-# Install dependencies and build
 RUN npm install
 RUN npm run build
 
-# Set up server build
+# Copy and build server
+WORKDIR /app
+COPY server server/
 WORKDIR /app/server
-
-# Copy entire server directory
-COPY server/ ./
-
-# Install production dependencies
 RUN npm install --omit=dev
 
 # Production stage
 FROM node:18-alpine
-
-# Create necessary directories
-RUN mkdir -p /app/client/build /app/server
 
 WORKDIR /app
 
