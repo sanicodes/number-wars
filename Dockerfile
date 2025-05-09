@@ -1,29 +1,33 @@
-# Build stage
-FROM node:16-alpine as builder
+# Use Node.js LTS
+FROM node:18-alpine
 
-# Build client
-WORKDIR /app
-COPY package*.json ./
-COPY client/ ./client/
-COPY server/ ./server/
-RUN npm run install:all
-WORKDIR /app/client
-RUN npm run build
-
-# Production stage
-FROM node:16-alpine
+# Set working directory
 WORKDIR /app
 
-# Copy package files and install server dependencies
-COPY package*.json ./
-COPY server/ ./server/
+# Copy package files
+COPY package.json ./
+COPY client/package.json ./client/
+COPY server/package.json ./server/
+
+# Install dependencies
+RUN npm install
+RUN cd client && npm install
 RUN cd server && npm install
 
-# Copy client build
-COPY --from=builder /app/client/build ./server/public
+# Copy source files
+COPY client/ ./client/
+COPY server/ ./server/
 
+# Build client
+RUN cd client && npm run build
+
+# Move client build to server public directory
+RUN mkdir -p server/public && cp -r client/build/* server/public/
+
+# Set production environment
 ENV NODE_ENV=production
 ENV PORT=8080
 
+# Start server
 WORKDIR /app/server
 CMD ["node", "src/index.js"] 
