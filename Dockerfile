@@ -8,21 +8,32 @@ ENV NODE_ENV=production
 ENV CI=true
 ENV GENERATE_SOURCEMAP=false
 
+# Install debugging tools
+RUN apk add --no-cache tree
+
 # Set up build directory
 WORKDIR /app
+
+# Debug: Show initial state
+RUN pwd && echo "Initial directory structure:" && tree
 
 # Copy root package files
 COPY package*.json ./
 
 # Copy client and server directories
-COPY client client/
-COPY server server/
+COPY . .
+
+# Debug: Show copied files
+RUN echo "After copying files:" && tree
 
 # Build client
 WORKDIR /app/client
-RUN ls -la && \
+RUN echo "Client directory contents:" && \
+    ls -la && \
+    echo "Client package.json contents:" && \
+    cat package.json && \
     npm install --legacy-peer-deps && \
-    npm run build
+    NODE_ENV=production npm run build
 
 # Build server
 WORKDIR /app/server
