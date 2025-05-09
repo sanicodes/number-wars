@@ -1,15 +1,18 @@
 # Build stage
 FROM node:18-alpine as builder
 
+# Create necessary directories
+RUN mkdir -p /app/client /app/server
+
 # Set up client build
 WORKDIR /app/client
 
 # Copy client package files and install dependencies
-COPY client/package*.json ./
+COPY ./client/package*.json ./
 RUN npm install
 
 # Copy client source code
-COPY client/ ./
+COPY ./client/ ./
 
 # Build client
 RUN npm run build
@@ -18,14 +21,17 @@ RUN npm run build
 WORKDIR /app/server
 
 # Copy server package files and install dependencies
-COPY server/package*.json ./
+COPY ./server/package*.json ./
 RUN npm install --omit=dev
 
 # Copy server source code
-COPY server/ ./
+COPY ./server/ ./
 
 # Production stage
 FROM node:18-alpine
+
+# Create necessary directories
+RUN mkdir -p /app/client/build /app/server
 
 WORKDIR /app
 
