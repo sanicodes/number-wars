@@ -30,37 +30,51 @@ git clone <repository-url>
 cd aqua-regia-game
 ```
 
-2. Install dependencies for both client and server:
+2. Install all dependencies:
 ```bash
-# Install root dependencies
-npm install
+npm run install:all
+```
 
-# Install client dependencies
-cd client
-npm install
+## Available Commands
 
-# Install server dependencies
-cd ../server
-npm install
+From the root directory, you can run the following commands:
+
+```bash
+# Install all dependencies (root, client, and server)
+npm run install:all
+
+# Start both client and server concurrently
+npm start
+
+# Start only the client
+npm run start:client
+
+# Start only the server
+npm run start:server
+
+# Build the client application
+npm run build
+
+# Run tests for both client and server
+npm test
+
+# Run tests for client only
+npm run test:client
+
+# Run tests for server only
+npm run test:server
 ```
 
 ## Development
 
-To run the development servers:
-
-1. Start the backend server:
-```bash
-cd server
-npm start
-```
-
-2. In a new terminal, start the frontend:
-```bash
-cd client
-npm start
-```
-
 The client will run on http://localhost:3000 and the server on http://localhost:5000.
+
+To start development, simply run:
+```bash
+npm start
+```
+
+This will start both the client and server concurrently.
 
 ## Game Rules
 
