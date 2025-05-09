@@ -1,7 +1,12 @@
 # syntax=docker/dockerfile:1
 
 # Build stage
-FROM node:18-alpine as builder
+FROM node:16-alpine as builder
+
+# Set environment variables for build
+ENV NODE_ENV=production
+ENV CI=true
+ENV GENERATE_SOURCEMAP=false
 
 WORKDIR /app
 
@@ -13,7 +18,7 @@ COPY client client/
 
 # Build client
 WORKDIR /app/client
-RUN npm install
+RUN npm install --legacy-peer-deps
 RUN npm run build
 
 # Copy and build server
@@ -23,7 +28,7 @@ WORKDIR /app/server
 RUN npm install --omit=dev
 
 # Production stage
-FROM node:18-alpine
+FROM node:16-alpine
 
 WORKDIR /app
 
