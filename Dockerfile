@@ -9,12 +9,12 @@ COPY . .
 
 # Install dependencies
 RUN npm install
-RUN cd client && npm install
+RUN cd client && npm install && npm install react-scripts
 RUN cd server && npm install
 
 # Build client
 WORKDIR /app/client
-RUN GENERATE_SOURCEMAP=false npx react-scripts build
+RUN npm run build
 WORKDIR /app
 
 # Create public directory and copy build files
