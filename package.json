@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "install:all": "cd client && npm install && cd ../server && npm install",
-    "start:server": "cd server && npm start"
+    "start:server": "cd server && npm start",
+    "build": "echo 'Build is handled by Dockerfile'"
   },
   "engines": {
     "node": ">=14.0.0"
