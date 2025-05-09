@@ -8,18 +8,23 @@ ENV NODE_ENV=production
 ENV CI=true
 ENV GENERATE_SOURCEMAP=false
 
-# Set up client build
+# Set up build directory
 WORKDIR /app
 
-# Copy everything first
-COPY . .
+# Copy root package files
+COPY package*.json ./
 
-# Install and build client
+# Copy client and server directories
+COPY client client/
+COPY server server/
+
+# Build client
 WORKDIR /app/client
-RUN npm install --legacy-peer-deps
-RUN npm run build
+RUN ls -la && \
+    npm install --legacy-peer-deps && \
+    npm run build
 
-# Install server dependencies
+# Build server
 WORKDIR /app/server
 RUN npm install --omit=dev
 
