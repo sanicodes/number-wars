@@ -2,25 +2,27 @@
 FROM node:16-alpine as builder
 
 # Build client
-WORKDIR /app/client
-COPY client/package*.json ./
-RUN npm install
-COPY client/ ./
-RUN npm run build
+WORKDIR /app
+COPY package*.json ./
+COPY client/ ./client/
+COPY server/ ./server/
+RUN npm run install:all
+RUN cd client && npm run build
 
 # Production stage
 FROM node:16-alpine
 WORKDIR /app
 
-# Copy server files
-COPY server/package*.json ./
-RUN npm install
-COPY server/ ./
+# Copy package files and install server dependencies
+COPY package*.json ./
+COPY server/ ./server/
+RUN cd server && npm install
 
 # Copy client build
-COPY --from=builder /app/client/build ./public
+COPY --from=builder /app/client/build ./server/public
 
 ENV NODE_ENV=production
 ENV PORT=8080
 
+WORKDIR /app/server
 CMD ["node", "src/index.js"] 
