@@ -24,4 +24,4 @@ ENV PORT=8080
 
 # Start server
 WORKDIR /app/server
-CMD ["node", "src/index.js"] 
+CMD ["node", "index.js"] 
