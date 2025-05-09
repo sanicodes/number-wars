@@ -4,8 +4,6 @@
   "private": true,
   "scripts": {
     "install:all": "cd client && npm install && cd ../server && npm install",
-    "build": "npm run build:client",
-    "build:client": "cd client && npm run build",
     "start:server": "cd server && npm start"
   },
   "engines": {
