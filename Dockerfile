@@ -8,11 +8,12 @@ RUN mkdir -p /app/client /app/server
 WORKDIR /app/client
 
 # Copy client package files and install dependencies
-COPY ./client/package*.json ./
+COPY client/package.json client/package-lock.json ./
 RUN npm install
 
 # Copy client source code
-COPY ./client/ ./
+COPY client/src ./src
+COPY client/public ./public
 
 # Build client
 RUN npm run build
@@ -21,11 +22,11 @@ RUN npm run build
 WORKDIR /app/server
 
 # Copy server package files and install dependencies
-COPY ./server/package*.json ./
+COPY server/package.json server/package-lock.json ./
 RUN npm install --omit=dev
 
 # Copy server source code
-COPY ./server/ ./
+COPY server/src ./src
 
 # Production stage
 FROM node:18-alpine
@@ -47,4 +48,4 @@ ENV PORT=5000
 
 # Start the server
 WORKDIR /app/server
-CMD ["node", "index.js"] 
+CMD ["node", "src/index.js"] 
