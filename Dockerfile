@@ -15,29 +15,26 @@ RUN apk add --no-cache tree
 WORKDIR /app
 
 # Debug: Show initial state
-RUN pwd && echo "Initial directory structure:" && tree
+RUN pwd && echo "Initial directory structure:" && ls -la
 
-# Copy root package files
-COPY package*.json ./
-
-# Copy client and server directories
+# Copy the entire project
 COPY . .
 
 # Debug: Show copied files
-RUN echo "After copying files:" && tree
+RUN echo "After copying files:" && ls -la && \
+    echo "\nClient directory:" && ls -la client/ && \
+    echo "\nServer directory:" && ls -la server/
 
 # Build client
 WORKDIR /app/client
-RUN echo "Client directory contents:" && \
-    ls -la && \
-    echo "Client package.json contents:" && \
-    cat package.json && \
+RUN echo "Building client..." && \
     npm install --legacy-peer-deps && \
     NODE_ENV=production npm run build
 
 # Build server
 WORKDIR /app/server
-RUN npm install --omit=dev
+RUN echo "Building server..." && \
+    npm install --omit=dev
 
 # Production stage
 FROM node:16-alpine
