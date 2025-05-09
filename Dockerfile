@@ -14,8 +14,9 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build client
-RUN cd client && npm run build
+# Build client directly using react-scripts
+RUN cd client && \
+    npx react-scripts build
 
 # Production stage
 FROM node:18-alpine
@@ -30,7 +31,8 @@ COPY --from=builder /app/server ./server
 COPY --from=builder /app/server/package*.json ./server/
 
 # Install production dependencies
-RUN cd server && npm install --production
+RUN cd server && \
+    npm install --omit=dev
 
 # Set environment variables
 ENV NODE_ENV=production
@@ -38,4 +40,4 @@ ENV PORT=5000
 
 # Start the server
 WORKDIR /app/server
-CMD ["npm", "start"] 
+CMD ["node", "index.js"] 
