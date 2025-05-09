@@ -7,7 +7,8 @@ COPY package*.json ./
 COPY client/ ./client/
 COPY server/ ./server/
 RUN npm run install:all
-RUN cd client && npm run build
+WORKDIR /app/client
+RUN npm run build
 
 # Production stage
 FROM node:16-alpine
