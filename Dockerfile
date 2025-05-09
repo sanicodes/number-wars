@@ -3,20 +3,17 @@ FROM node:18-alpine as builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files and install dependencies for client
 COPY client/package*.json ./client/
-COPY server/package*.json ./server/
-
-# Install dependencies
+WORKDIR /app/client
 RUN npm install
 
-# Copy source code
-COPY . .
+# Copy client source code
+COPY client/ ./client/
+WORKDIR /app/client
 
-# Build client directly using react-scripts
-RUN cd client && \
-    npx react-scripts build
+# Build client
+RUN npm run build
 
 # Production stage
 FROM node:18-alpine
@@ -26,18 +23,15 @@ WORKDIR /app
 # Copy built client files
 COPY --from=builder /app/client/build ./client/build
 
-# Copy server files
-COPY --from=builder /app/server ./server
-COPY --from=builder /app/server/package*.json ./server/
-
-# Install production dependencies
-RUN cd server && \
-    npm install --omit=dev
+# Copy server files and install dependencies
+COPY server/package*.json ./server/
+WORKDIR /app/server
+RUN npm install --omit=dev
+COPY server/ ./server/
 
 # Set environment variables
 ENV NODE_ENV=production
 ENV PORT=5000
 
 # Start the server
-WORKDIR /app/server
 CMD ["node", "index.js"] 
