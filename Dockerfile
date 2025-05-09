@@ -4,19 +4,13 @@ FROM node:18-alpine
 # Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package.json ./
-COPY client/package.json ./client/
-COPY server/package.json ./server/
+# Copy all files
+COPY . .
 
 # Install dependencies
 RUN npm install
 RUN cd client && npm install
 RUN cd server && npm install
-
-# Copy source files
-COPY client/ ./client/
-COPY server/ ./server/
 
 # Build client
 RUN cd client && npm run build
