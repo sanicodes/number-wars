@@ -14,7 +14,7 @@ RUN cd server && npm install
 
 # Build client
 WORKDIR /app/client
-RUN npm run build
+RUN GENERATE_SOURCEMAP=false npx react-scripts build
 WORKDIR /app
 
 # Create public directory and copy build files
