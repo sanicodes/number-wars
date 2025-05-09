@@ -13,7 +13,7 @@ RUN cd client && npm install
 RUN cd server && npm install
 
 # Build client
-RUN cd client && npm run build
+RUN cd client && npm run build --prefix client
 
 # Create public directory and copy build files
 RUN mkdir -p server/public
