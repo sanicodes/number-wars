@@ -7,26 +7,21 @@ RUN mkdir -p /app/client /app/server
 # Set up client build
 WORKDIR /app/client
 
-# Copy client package files and install dependencies
-COPY client/package.json client/package-lock.json ./
+# Copy entire client directory
+COPY client/ ./
+
+# Install dependencies and build
 RUN npm install
-
-# Copy client source code
-COPY client/src ./src
-COPY client/public ./public
-
-# Build client
 RUN npm run build
 
 # Set up server build
 WORKDIR /app/server
 
-# Copy server package files and install dependencies
-COPY server/package.json server/package-lock.json ./
-RUN npm install --omit=dev
+# Copy entire server directory
+COPY server/ ./
 
-# Copy server source code
-COPY server/src ./src
+# Install production dependencies
+RUN npm install --omit=dev
 
 # Production stage
 FROM node:18-alpine
