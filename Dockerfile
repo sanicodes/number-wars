@@ -8,24 +8,33 @@ ENV NODE_ENV=production
 ENV CI=true
 ENV GENERATE_SOURCEMAP=false
 
-WORKDIR /app
+# Set up client build
+WORKDIR /app/client
 
-# Copy root package files
-COPY package*.json ./
+# Copy client package files first
+COPY client/package.json client/package-lock.json ./
 
-# Copy client files
-COPY client client/
+# Install client dependencies
+RUN npm install --legacy-peer-deps
+
+# Copy client source code
+COPY client/src ./src
+COPY client/public ./public
 
 # Build client
-WORKDIR /app/client
-RUN npm install --legacy-peer-deps
 RUN npm run build
 
-# Copy and build server
-WORKDIR /app
-COPY server server/
+# Set up server build
 WORKDIR /app/server
+
+# Copy server package files
+COPY server/package.json server/package-lock.json ./
+
+# Install server dependencies
 RUN npm install --omit=dev
+
+# Copy server source code
+COPY server/src ./src
 
 # Production stage
 FROM node:16-alpine
