@@ -1,0 +1,63 @@
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1a237e 0%, #0d47a1 100%);
+  color: #fff;
+}
+
+.MuiPaper-root {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #000 !important;
+}
+
+.MuiTypography-root {
+  font-family: 'Roboto', sans-serif;
+}
+
+.MuiButton-contained {
+  background-color: #1a237e !important;
+  color: white !important;
+  font-weight: bold !important;
+}
+
+.MuiButton-contained:hover {
+  background-color: #0d47a1 !important;
+}
+
+.MuiButton-contained.Mui-disabled {
+  background-color: rgba(0, 0, 0, 0.12) !important;
+  color: rgba(0, 0, 0, 0.26) !important;
+}
+
+.MuiButton-contained.MuiButton-colorSuccess {
+  background-color: #2e7d32 !important;
+}
+
+.MuiButton-contained.MuiButton-colorSuccess:hover {
+  background-color: #1b5e20 !important;
+}
+
+.MuiTextField-root .MuiOutlinedInput-root {
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+.MuiTableRow-root.Mui-selected {
+  background-color: rgba(25, 118, 210, 0.08) !important;
+}
+
+.MuiTableRow-root.Mui-selected:hover {
+  background-color: rgba(25, 118, 210, 0.12) !important;
+}
+
+.new-rule-alert {
+  background-color: #ff9800 !important;
+  color: white !important;
+  margin-bottom: 16px !important;
+}
+
+.round-info {
+  background-color: #1976d2 !important;
+  color: white !important;
+  margin-bottom: 16px !important;
+} 
