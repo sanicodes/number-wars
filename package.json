@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "echo 'Build is handled by Dockerfile'"
+    "install-all": "npm install && cd client && npm install && cd ../server && npm install",
+    "start": "cd server && node index.js",
+    "dev": "cd server && node index.js",
+    "build": "cd client && npm run build"
   },
   "engines": {
     "node": ">=18.0.0"
