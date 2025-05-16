@@ -38,6 +38,7 @@ class Game {
     this.eliminatedPlayers = 0;
     this.lastEliminatedCount = 0;
     this.lastWinner = null;
+    this.gameStarted = false;
   }
 
   isUsernameTaken(username) {
@@ -47,6 +48,9 @@ class Game {
   }
 
   addPlayer(socketId, playerName) {
+    if (this.gameStarted) {
+      return { success: false, message: 'Game has already started' };
+    }
     if (this.players.size >= MAX_PLAYERS) {
       return { success: false, message: 'Game is full' };
     }
@@ -266,6 +270,7 @@ io.on('connection', (socket) => {
       player.ready = true;
       const allReady = Array.from(game.players.values()).every(p => p.ready);
       if (allReady && game.players.size >= 2) {
+        game.gameStarted = true;
         game.roundInProgress = true;
         game.currentRound++;
         game.roundTime = game.shouldUseNewRuleTime() ? NEW_RULE_TIME : ROUND_TIME;
