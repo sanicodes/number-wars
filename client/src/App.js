@@ -1,30 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import {
-  Container,
-  Box,
-  Typography,
-  TextField,
-  Button,
-  Paper,
-  Grid,
-  CircularProgress,
   Alert,
+  Box,
+  Button,
+  Chip,
+  Container,
+  Grid,
+  Paper,
+  Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Card,
-  CardContent,
+  TextField,
+  Typography,
 } from '@mui/material';
 import './App.css';
 
-// Socket.io connection
 const getServerUrl = () => {
   if (process.env.NODE_ENV === 'production') {
-    // For Railway deployment, we'll use the same origin
     return window.location.origin;
   }
   return 'http://localhost:5000';
@@ -36,9 +33,17 @@ const socket = io(getServerUrl(), {
   reconnectionDelay: 1000,
 });
 
+const STATUS_COPY = {
+  joining: 'Enter the lobby and wait for everyone to get ready.',
+  waiting: 'You are in the lobby. Review the rules and lock in when ready.',
+  playing: 'Pick a number strategically. Closest to 80% of the average wins.',
+  results: 'Round finished. Review the outcome and get ready for the next one.',
+  gameOver: 'The match is complete.',
+};
+
 function App() {
   const [playerName, setPlayerName] = useState('');
-  const [gameState, setGameState] = useState('joining'); // joining, waiting, playing, results, gameOver
+  const [gameState, setGameState] = useState('joining');
   const [players, setPlayers] = useState([]);
   const [selectedNumber, setSelectedNumber] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -49,11 +54,15 @@ function App() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
-  // Generate cards array (0-100)
   const cards = Array.from({ length: 101 }, (_, i) => i);
+  const playerCount = players.length;
+  const sortedPlayers = [...players].sort((a, b) => b[1].score - a[1].score);
+  const readyCount = players.filter(([_, player]) => player.ready).length;
+  const aliveCount = players.filter(([_, player]) => player.score > 0).length;
 
   useEffect(() => {
     socket.on('joinSuccess', () => {
+      setError('');
       setGameState('waiting');
     });
 
@@ -88,10 +97,10 @@ function App() {
     socket.on('gameOver', (data) => {
       setGameState('gameOver');
       if (data.winner) {
-        setRoundResults(prev => ({
+        setRoundResults((prev) => ({
           ...prev,
           winner: data.winner.id,
-          winnerName: data.winner.name
+          winnerName: data.winner.name,
         }));
       }
     });
@@ -141,11 +150,67 @@ function App() {
     }
   };
 
-  const renderScoreboard = () => {
-    const sortedPlayers = [...players].sort((a, b) => b[1].score - a[1].score);
-    
-    return (
-      <TableContainer component={Paper} sx={{ mt: 2, mb: 2 }}>
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainder = seconds % 60;
+    return `${minutes}:${remainder.toString().padStart(2, '0')}`;
+  };
+
+  const getStatusTone = () => {
+    if (gameState === 'playing') return 'success';
+    if (gameState === 'results') return 'warning';
+    return 'info';
+  };
+
+  const renderHero = () => (
+    <Paper className="hero-panel" elevation={0}>
+      <Stack spacing={2}>
+        <Box className="hero-topline">
+          <Chip label="Multiplayer strategy game" className="hero-chip" />
+          <Chip label={`${playerCount}/5 players`} variant="outlined" className="hero-chip-muted" />
+        </Box>
+        <Typography variant="h2" className="hero-title">
+          Number Wars
+        </Typography>
+        <Typography variant="body1" className="hero-subtitle">
+          Clean, fast, competitive. Pick the number closest to 80% of the average and survive longer than everyone else.
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={4}>
+            <Box className="stat-card">
+              <Typography className="stat-label">Players ready</Typography>
+              <Typography className="stat-value">{readyCount}</Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <Box className="stat-card">
+              <Typography className="stat-label">Players alive</Typography>
+              <Typography className="stat-value">{aliveCount}</Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <Box className="stat-card">
+              <Typography className="stat-label">Round timer</Typography>
+              <Typography className="stat-value">{gameState === 'playing' ? formatTime(timeLeft) : '--:--'}</Typography>
+            </Box>
+          </Grid>
+        </Grid>
+      </Stack>
+    </Paper>
+  );
+
+  const renderScoreboard = () => (
+    <Paper className="section-panel" elevation={0}>
+      <Box className="section-header">
+        <Box>
+          <Typography variant="h5">Leaderboard</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Live rankings based on remaining score.
+          </Typography>
+        </Box>
+        <Chip label={`${playerCount} active`} className="soft-chip" />
+      </Box>
+      <TableContainer>
         <Table>
           <TableHead>
             <TableRow>
@@ -156,137 +221,125 @@ function App() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {sortedPlayers.map(([id, player], index) => (
-              <TableRow 
-                key={id}
-                sx={{ 
-                  bgcolor: id === socket.id ? 'rgba(25, 118, 210, 0.08)' : 'inherit',
-                  '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' }
-                }}
-              >
-                <TableCell>{index + 1}</TableCell>
-                <TableCell>{player.name}</TableCell>
-                <TableCell align="right">{player.score}</TableCell>
-                <TableCell align="right">
-                  {player.ready ? 'Ready' : 'Waiting'}
-                </TableCell>
-              </TableRow>
-            ))}
+            {sortedPlayers.map(([id, player], index) => {
+              const isCurrentPlayer = id === socket.id;
+              return (
+                <TableRow key={id} className={isCurrentPlayer ? 'table-row-current' : ''}>
+                  <TableCell>
+                    <Box className="rank-badge">#{index + 1}</Box>
+                  </TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Box className="player-avatar">{player.name?.charAt(0)?.toUpperCase() || '?'}</Box>
+                      <Box>
+                        <Typography className="player-name">{player.name}</Typography>
+                        {isCurrentPlayer && <Typography className="player-self">You</Typography>}
+                      </Box>
+                    </Stack>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography className="score-value">{player.score}</Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Chip
+                      size="small"
+                      label={player.ready ? 'Ready' : 'Waiting'}
+                      color={player.ready ? 'success' : 'default'}
+                      variant={player.ready ? 'filled' : 'outlined'}
+                    />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>
-    );
-  };
+    </Paper>
+  );
+
+  const renderRules = () => (
+    <Paper className="section-panel" elevation={0}>
+      <Box className="section-header">
+        <Box>
+          <Typography variant="h5">Rules</Typography>
+          <Typography variant="body2" color="text.secondary">
+            The rule set changes as the match narrows down.
+          </Typography>
+        </Box>
+        <Chip label={`${playerCount || 0} players`} className="soft-chip" />
+      </Box>
+      <Stack spacing={1.25} className="rules-list">
+        <Typography>All players start with 10 points.</Typography>
+        <Typography>Pick any number from 0 to 100.</Typography>
+        <Typography>Target number = average of all picks × 0.8.</Typography>
+        <Typography>Closest valid pick wins the round.</Typography>
+        <Typography className="rule-accent">Matching someone else's number costs 2 points.</Typography>
+        {playerCount === 4 && (
+          <Typography className="rule-accent">At 4 players: duplicates lose 1 point, then the best unique number wins.</Typography>
+        )}
+        {playerCount === 3 && (
+          <Typography className="rule-accent">At 3 players: an exact target hit doubles the losers' penalty.</Typography>
+        )}
+        {playerCount === 2 && (
+          <Typography className="rule-accent">At 2 players: 0 vs 100 triggers an instant win for 100.</Typography>
+        )}
+        <Typography>Hit 0 points and you're eliminated.</Typography>
+        <Typography className="rule-win">Last player standing wins the game.</Typography>
+      </Stack>
+    </Paper>
+  );
 
   const renderRoundInfo = () => {
     if (!roundInfo) return null;
 
     return (
-      <Alert severity="info" className="round-info">
-        <Typography variant="h6">
-          Round {roundInfo.round} - {roundInfo.players} Players Remaining
-        </Typography>
-        {roundInfo.newRuleIntroduced && (
-          <Typography>
-            New rule introduced! You have 5 minutes to read and understand the rules.
+      <Alert severity={getStatusTone()} className="round-banner">
+        <Stack spacing={0.75}>
+          <Typography variant="subtitle1" fontWeight={700}>
+            Round {roundInfo.round} is live · {roundInfo.players} players remaining
           </Typography>
-        )}
+          <Typography variant="body2">
+            {roundInfo.newRuleIntroduced
+              ? 'A new rule is active this round. Take a second to read before you commit your number.'
+              : 'Pick carefully. Once you submit, your number is locked in.'}
+          </Typography>
+        </Stack>
       </Alert>
     );
   };
 
-  const renderRules = () => {
-    const playerCount = players.length;
-    return (
-      <Box sx={{ mt: 2 }}>
-        <Typography variant="h6">Current Rules:</Typography>
-        <Typography>• All players start with 10 points</Typography>
-        <Typography>• All players select a number between 0 and 100</Typography>
-        <Typography>• Average × 0.8 = Target number</Typography>
-        <Typography>• Closest to target wins, others lose 1 point</Typography>
-        <Typography color="error">• Choosing the same number as another player results in -2 points</Typography>
-        {playerCount === 4 && (
-          <Typography color="error">• Duplicate numbers lose 1 point!</Typography>
-        )}
-        {playerCount === 3 && (
-          <Typography color="error">• Exact match doubles loser penalty!</Typography>
-        )}
-        {playerCount === 2 && (
-          <Typography color="error">• If one player chooses 0 and the other 100, it's an instant win!</Typography>
-        )}
-        <Typography color="error" sx={{ mt: 1 }}>
-          • Game Over at 0 points (player is eliminated)
-        </Typography>
-        <Typography color="primary" sx={{ mt: 1 }}>
-          • Last player standing wins the game!
-        </Typography>
+  const renderCardGrid = () => (
+    <Paper className="section-panel" elevation={0}>
+      <Box className="section-header">
+        <Box>
+          <Typography variant="h5">Choose your number</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {hasSubmitted ? 'Your pick has been submitted.' : 'Tap a card to select your play.'}
+          </Typography>
+        </Box>
+        <Chip
+          label={selectedNumber !== null ? `Selected ${selectedNumber}` : 'No selection'}
+          className={selectedNumber !== null ? 'soft-chip selected' : 'soft-chip'}
+        />
       </Box>
-    );
-  };
-
-  const renderCardGrid = () => {
-    return (
-      <Grid container spacing={1} sx={{ mt: 2 }}>
-        {cards.map((number) => (
-          <Grid item xs={2} sm={1.5} md={1} key={number}>
-            <Card
-              sx={{
-                cursor: hasSubmitted ? 'default' : 'pointer',
-                bgcolor: selectedNumber === number ? '#4caf50' : 'white',
-                color: selectedNumber === number ? 'white' : 'inherit',
-                '&:hover': {
-                  bgcolor: hasSubmitted ? 'inherit' : selectedNumber === number ? '#4caf50' : '#f5f5f5',
-                },
-                transition: 'all 0.3s ease',
-                transform: selectedNumber === number ? 'scale(1.1)' : 'scale(1)',
-                boxShadow: selectedNumber === number 
-                  ? '0 0 15px rgba(76, 175, 80, 0.5), 0 0 5px rgba(76, 175, 80, 0.3)' 
-                  : '0 2px 4px rgba(0,0,0,0.1)',
-                border: selectedNumber === number 
-                  ? '3px solid #2e7d32' 
-                  : '1px solid rgba(0,0,0,0.1)',
-                position: 'relative',
-                '&::after': selectedNumber === number ? {
-                  content: '""',
-                  position: 'absolute',
-                  top: -2,
-                  left: -2,
-                  right: -2,
-                  bottom: -2,
-                  border: '2px solid #4caf50',
-                  borderRadius: '4px',
-                  animation: 'pulse 1.5s infinite',
-                } : {},
-                '@keyframes pulse': {
-                  '0%': {
-                    boxShadow: '0 0 0 0 rgba(76, 175, 80, 0.4)',
-                  },
-                  '70%': {
-                    boxShadow: '0 0 0 10px rgba(76, 175, 80, 0)',
-                  },
-                  '100%': {
-                    boxShadow: '0 0 0 0 rgba(76, 175, 80, 0)',
-                  },
-                },
-              }}
+      <Box className="number-grid">
+        {cards.map((number) => {
+          const isSelected = selectedNumber === number;
+          return (
+            <button
+              type="button"
+              key={number}
+              className={`number-card${isSelected ? ' selected' : ''}${hasSubmitted ? ' locked' : ''}`}
               onClick={() => handleCardSelect(number)}
+              disabled={hasSubmitted}
             >
-              <CardContent 
-                sx={{ 
-                  p: 1, 
-                  textAlign: 'center',
-                  fontWeight: selectedNumber === number ? 'bold' : 'normal',
-                  fontSize: selectedNumber === number ? '1.2rem' : '1rem',
-                }}
-              >
-                <Typography variant="h6">{number}</Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-    );
-  };
+              <span>{number}</span>
+            </button>
+          );
+        })}
+      </Box>
+    </Paper>
+  );
 
   const renderResults = () => {
     if (!roundResults) return null;
@@ -296,70 +349,85 @@ function App() {
     const target = average * 0.8;
 
     return (
-      <Box sx={{ mt: 3 }}>
-        <Typography variant="h6" gutterBottom>Round Results:</Typography>
-        <Typography>Average: {average.toFixed(2)}</Typography>
-        <Typography>Target (Average × 0.8): {target.toFixed(2)}</Typography>
-        <Typography variant="h6" sx={{ mt: 2 }}>Player Numbers:</Typography>
-        <Grid container spacing={2} sx={{ mt: 1 }}>
-          {roundResults.players.map(([id, player]) => (
-            <Grid item xs={12} sm={6} key={id}>
-              <Paper 
-                sx={{ 
-                  p: 2, 
-                  bgcolor: id === roundResults.winner ? '#4caf50' : '#f44336',
-                  color: 'white'
-                }}
-              >
-                <Typography>
-                  {player.name}: {player.number}
-                </Typography>
-                <Typography>
-                  Score: {player.score} points
-                  {id === roundResults.winner && ' - Winner!'}
-                </Typography>
-              </Paper>
+      <Stack spacing={3}>
+        <Paper className="section-panel highlight-panel" elevation={0}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={4}>
+              <Box className="result-stat">
+                <Typography className="stat-label">Average</Typography>
+                <Typography className="result-value">{average.toFixed(2)}</Typography>
+              </Box>
             </Grid>
-          ))}
+            <Grid item xs={12} sm={4}>
+              <Box className="result-stat">
+                <Typography className="stat-label">Target</Typography>
+                <Typography className="result-value">{target.toFixed(2)}</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <Box className="result-stat">
+                <Typography className="stat-label">Round winner</Typography>
+                <Typography className="result-value">
+                  {roundResults.winnerName || roundResults.players.find(([id]) => id === roundResults.winner)?.[1]?.name || 'No winner'}
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </Paper>
+
+        <Grid container spacing={2}>
+          {roundResults.players.map(([id, player]) => {
+            const isWinner = id === roundResults.winner;
+            return (
+              <Grid item xs={12} md={6} key={id}>
+                <Paper className={`result-card${isWinner ? ' winner' : ''}`} elevation={0}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                    <Typography variant="h6">{player.name}</Typography>
+                    <Chip label={isWinner ? 'Winner' : 'Round summary'} color={isWinner ? 'success' : 'default'} />
+                  </Stack>
+                  <Typography className="result-line">Number picked: <strong>{player.number}</strong></Typography>
+                  <Typography className="result-line">Score remaining: <strong>{player.score}</strong></Typography>
+                </Paper>
+              </Grid>
+            );
+          })}
         </Grid>
+
         {roundResults.newRuleIntroduced && (
-          <Alert severity="warning" className="new-rule-alert" sx={{ mt: 2 }}>
-            A new rule has been introduced! Check the rules section above.
+          <Alert severity="warning" className="round-banner">
+            New rule introduced for the next stage. Double-check the rules panel before continuing.
           </Alert>
         )}
+
         <Button
           variant="contained"
           fullWidth
+          size="large"
           onClick={handleReady}
           disabled={isReady}
-          color={isReady ? "success" : "primary"}
-          sx={{ mt: 2 }}
         >
-          {isReady ? "Ready for Next Round" : "Click to Ready for Next Round"}
+          {isReady ? 'Ready locked in' : 'Ready for next round'}
         </Button>
-      </Box>
+      </Stack>
     );
   };
 
   if (gameState === 'gameOver') {
     return (
-      <Container maxWidth="sm" sx={{ mt: 4 }}>
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="h4" color="primary" gutterBottom>
-            Game Over!
-          </Typography>
+      <Container maxWidth="sm" className="app-shell">
+        <Paper className="center-panel" elevation={0}>
+          <Chip label="Match complete" className="soft-chip" />
+          <Typography variant="h3" sx={{ mt: 2, mb: 1 }}>Game Over</Typography>
           {roundResults?.winnerName ? (
             <>
-              <Typography variant="h5" gutterBottom>
-                {roundResults.winnerName} wins the game!
-              </Typography>
-              <Typography>
-                Congratulations to the last player standing!
+              <Typography variant="h5">{roundResults.winnerName} wins the match.</Typography>
+              <Typography color="text.secondary" sx={{ mt: 1.5 }}>
+                Clean finish. Everyone else has been eliminated.
               </Typography>
             </>
           ) : (
-            <Typography>
-              The game has ended.
+            <Typography color="text.secondary" sx={{ mt: 1.5 }}>
+              The match has ended.
             </Typography>
           )}
         </Paper>
@@ -369,16 +437,12 @@ function App() {
 
   if (gameOver) {
     return (
-      <Container maxWidth="sm" sx={{ mt: 4 }}>
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="h4" color="error" gutterBottom>
-            You've Been Eliminated!
-          </Typography>
-          <Typography>
-            You have reached 0 points and have been eliminated from the game.
-          </Typography>
-          <Typography sx={{ mt: 2 }}>
-            You can still watch the game continue until a winner is determined.
+      <Container maxWidth="sm" className="app-shell">
+        <Paper className="center-panel" elevation={0}>
+          <Chip label="Eliminated" color="error" />
+          <Typography variant="h3" sx={{ mt: 2, mb: 1 }}>You are out</Typography>
+          <Typography color="text.secondary">
+            Your score reached 0, so you have been eliminated. You can still watch the rest of the match play out.
           </Typography>
         </Paper>
       </Container>
@@ -386,104 +450,123 @@ function App() {
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4 }}>
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+    <Container maxWidth="lg" className="app-shell">
+      <Stack spacing={3}>
+        {renderHero()}
 
-      {gameState === 'joining' && (
-        <Paper sx={{ p: 4 }}>
-          <Typography variant="h4" gutterBottom>
-            Number Wars
-          </Typography>
-          <form onSubmit={handleJoin}>
-            <TextField
-              fullWidth
-              label="Enter your name"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              sx={{ mb: 2 }}
-              error={error.includes('Username')}
-              helperText={error.includes('Username') ? error : ''}
-            />
-            <Button
-              type="submit"
-              variant="contained"
-              fullWidth
-              disabled={!playerName.trim()}
-            >
-              Join Game
-            </Button>
-          </form>
-        </Paper>
-      )}
+        {error && <Alert severity="error">{error}</Alert>}
 
-      {gameState === 'waiting' && (
-        <Paper sx={{ p: 4 }}>
-          <Typography variant="h4" gutterBottom>
-            Number Wars - Waiting Room
-          </Typography>
-          {renderScoreboard()}
-          {renderRules()}
-          <Button
-            variant="contained"
-            fullWidth
-            onClick={handleReady}
-            disabled={isReady}
-            color={isReady ? "success" : "primary"}
-            sx={{ mt: 2 }}
-          >
-            {isReady ? "Waiting for Other Players..." : "Click to Ready"}
-          </Button>
-        </Paper>
-      )}
-
-      {gameState === 'playing' && (
-        <Paper sx={{ p: 4 }}>
-          <Typography variant="h4" gutterBottom>
-            Number Wars - Round {roundInfo?.round}
-          </Typography>
-          {renderRoundInfo()}
-          {renderScoreboard()}
-          <Typography variant="h6" gutterBottom>
-            Time Left: {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-          </Typography>
-          
-          <Box sx={{ mt: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Select a Card:
+        <Paper className="status-strip" elevation={0}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1.5}>
+            <Box>
+              <Typography variant="overline" className="status-label">Current state</Typography>
+              <Typography variant="h6" className="status-title">{gameState.charAt(0).toUpperCase() + gameState.slice(1)}</Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary" className="status-copy">
+              {STATUS_COPY[gameState]}
             </Typography>
-            {renderCardGrid()}
-          </Box>
-
-          <Button
-            variant="contained"
-            fullWidth
-            onClick={handleSubmitNumber}
-            disabled={selectedNumber === null || hasSubmitted}
-            color={hasSubmitted ? "success" : "primary"}
-            sx={{ mt: 3 }}
-          >
-            {hasSubmitted ? "Card Submitted" : "Submit Card"}
-          </Button>
-
-          {renderRules()}
+          </Stack>
         </Paper>
-      )}
 
-      {gameState === 'results' && (
-        <Paper sx={{ p: 4 }}>
-          <Typography variant="h4" gutterBottom>
-            Number Wars - Round Results
-          </Typography>
-          {renderScoreboard()}
-          {renderResults()}
-        </Paper>
-      )}
+        {gameState === 'joining' && (
+          <Paper className="section-panel join-panel" elevation={0}>
+            <Grid container spacing={4} alignItems="center">
+              <Grid item xs={12} md={6}>
+                <Stack spacing={1.5}>
+                  <Typography variant="h4">Join the lobby</Typography>
+                  <Typography color="text.secondary">
+                    Set your player name, enter the room, and wait for everyone to ready up.
+                  </Typography>
+                  <Box className="mini-feature-grid">
+                    <Box className="mini-feature-card">
+                      <Typography className="mini-title">Fast rounds</Typography>
+                      <Typography className="mini-copy">Simple actions, strategic outcomes.</Typography>
+                    </Box>
+                    <Box className="mini-feature-card">
+                      <Typography className="mini-title">Dynamic rules</Typography>
+                      <Typography className="mini-copy">The game shifts as players get eliminated.</Typography>
+                    </Box>
+                  </Box>
+                </Stack>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <form onSubmit={handleJoin}>
+                  <Stack spacing={2}>
+                    <TextField
+                      fullWidth
+                      label="Player name"
+                      value={playerName}
+                      onChange={(e) => setPlayerName(e.target.value)}
+                      error={error.includes('Username')}
+                      helperText={error.includes('Username') ? error : 'Use a unique name visible to everyone in the match.'}
+                    />
+                    <Button type="submit" variant="contained" size="large" disabled={!playerName.trim()}>
+                      Join game
+                    </Button>
+                  </Stack>
+                </form>
+              </Grid>
+            </Grid>
+          </Paper>
+        )}
+
+        {(gameState === 'waiting' || gameState === 'playing' || gameState === 'results') && (
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={8}>
+              <Stack spacing={3}>
+                {gameState === 'playing' && renderRoundInfo()}
+                {gameState === 'playing' && (
+                  <Paper className="timer-panel" elevation={0}>
+                    <Typography className="timer-label">Time remaining</Typography>
+                    <Typography className="timer-value">{formatTime(timeLeft)}</Typography>
+                    <Typography color="text.secondary">Lock in your number before the round closes.</Typography>
+                  </Paper>
+                )}
+                {gameState === 'playing' && renderCardGrid()}
+                {gameState === 'results' && renderResults()}
+              </Stack>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Stack spacing={3}>
+                {renderScoreboard()}
+                {renderRules()}
+                {gameState === 'waiting' && (
+                  <Paper className="section-panel" elevation={0}>
+                    <Typography variant="h6" sx={{ mb: 1 }}>Ready check</Typography>
+                    <Typography color="text.secondary" sx={{ mb: 2 }}>
+                      Start when everyone is in and prepared.
+                    </Typography>
+                    <Button variant="contained" fullWidth size="large" onClick={handleReady} disabled={isReady}>
+                      {isReady ? 'Waiting for other players...' : 'I am ready'}
+                    </Button>
+                  </Paper>
+                )}
+                {gameState === 'playing' && (
+                  <Paper className="section-panel" elevation={0}>
+                    <Typography variant="h6" sx={{ mb: 1 }}>Submit move</Typography>
+                    <Typography color="text.secondary" sx={{ mb: 2 }}>
+                      {selectedNumber !== null
+                        ? `Selected number: ${selectedNumber}`
+                        : 'Choose a number from the grid first.'}
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      size="large"
+                      onClick={handleSubmitNumber}
+                      disabled={selectedNumber === null || hasSubmitted}
+                    >
+                      {hasSubmitted ? 'Number submitted' : 'Submit number'}
+                    </Button>
+                  </Paper>
+                )}
+              </Stack>
+            </Grid>
+          </Grid>
+        )}
+      </Stack>
     </Container>
   );
 }
 
-export default App; 
+export default App;

@@ -8,14 +8,74 @@ const theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#1a237e',
+      main: '#2563eb',
     },
     secondary: {
-      main: '#0d47a1',
+      main: '#7c3aed',
+    },
+    background: {
+      default: '#eef3f9',
+      paper: '#ffffff',
+    },
+    text: {
+      primary: '#0f172a',
+      secondary: '#475569',
+    },
+    success: {
+      main: '#16a34a',
+    },
+    warning: {
+      main: '#d97706',
+    },
+    error: {
+      main: '#dc2626',
     },
   },
+  shape: {
+    borderRadius: 18,
+  },
   typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    fontFamily: ['Inter', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'].join(','),
+    h2: {
+      fontWeight: 800,
+    },
+    h3: {
+      fontWeight: 800,
+      letterSpacing: '-0.04em',
+    },
+    h4: {
+      fontWeight: 700,
+      letterSpacing: '-0.03em',
+    },
+    h5: {
+      fontWeight: 700,
+      letterSpacing: '-0.02em',
+    },
+    button: {
+      textTransform: 'none',
+      fontWeight: 700,
+    },
+  },
+  components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          margin: 0,
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
+        },
+      },
+    },
+    MuiButton: {
+      defaultProps: {
+        disableElevation: true,
+      },
+    },
   },
 });
 
@@ -27,4 +87,4 @@ root.render(
       <App />
     </ThemeProvider>
   </React.StrictMode>
-); 
+);
