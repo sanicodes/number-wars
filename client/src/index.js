@@ -6,54 +6,71 @@ import App from './App';
 
 const theme = createTheme({
   palette: {
-    mode: 'light',
+    mode: 'dark',
     primary: {
-      main: '#2563eb',
+      main: '#F97316',
+      light: '#FDBA74',
+      dark: '#C2410C',
     },
     secondary: {
-      main: '#7c3aed',
+      main: '#22D3EE',
     },
     background: {
-      default: '#eef3f9',
-      paper: '#ffffff',
+      default: '#0B1026',
+      paper: '#151D46',
     },
     text: {
-      primary: '#0f172a',
-      secondary: '#475569',
+      primary: '#F8FAFC',
+      secondary: '#CBD5E1',
     },
     success: {
-      main: '#16a34a',
+      main: '#34D399',
     },
     warning: {
-      main: '#d97706',
+      main: '#F97316',
     },
     error: {
-      main: '#dc2626',
+      main: '#FB7185',
     },
+    divider: 'rgba(129, 140, 248, 0.18)',
   },
   shape: {
-    borderRadius: 18,
+    borderRadius: 8,
   },
   typography: {
-    fontFamily: ['Inter', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'].join(','),
+    fontFamily: "'Chakra Petch', sans-serif",
     h2: {
-      fontWeight: 800,
+      fontFamily: "'Russo One', sans-serif",
+      fontWeight: 400,
     },
     h3: {
-      fontWeight: 800,
-      letterSpacing: '-0.04em',
+      fontFamily: "'Russo One', sans-serif",
+      fontWeight: 400,
+      letterSpacing: '0',
     },
     h4: {
-      fontWeight: 700,
-      letterSpacing: '-0.03em',
+      fontFamily: "'Russo One', sans-serif",
+      fontWeight: 400,
+      letterSpacing: '0',
     },
     h5: {
-      fontWeight: 700,
-      letterSpacing: '-0.02em',
+      fontFamily: "'Russo One', sans-serif",
+      fontWeight: 400,
+      letterSpacing: '0',
+    },
+    h6: {
+      fontFamily: "'Russo One', sans-serif",
+      fontWeight: 400,
     },
     button: {
       textTransform: 'none',
+      fontWeight: 600,
+      letterSpacing: '0.02em',
+    },
+    overline: {
+      fontFamily: "'JetBrains Mono', monospace",
       fontWeight: 700,
+      letterSpacing: '0.12em',
     },
   },
   components: {

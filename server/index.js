@@ -23,9 +23,10 @@ const io = socketIo(server, {
   transports: ['websocket', 'polling']
 });
 
-const MAX_PLAYERS = 5;
+const MAX_PLAYERS = 10;
 const ROUND_TIME = 60000; // 1 minute
 const NEW_RULE_TIME = 300000; // 5 minutes
+const BETWEEN_ROUND_TIME = 60000; // 1 minute between rounds
 const GAME_OVER_POINTS = 0;
 const INITIAL_SCORE = 10;
 
@@ -39,6 +40,9 @@ class Game {
     this.lastEliminatedCount = 0;
     this.lastWinner = null;
     this.gameStarted = false;
+    this.roundTimer = null;
+    this.betweenRoundTimer = null;
+    this.eliminationOrder = [];
   }
 
   isUsernameTaken(username) {
@@ -216,7 +220,24 @@ class Game {
     return closestPlayer ? closestPlayer.socketId : null;
   }
 
+  penalizeNonSubmitters() {
+    this.players.forEach((player) => {
+      if (player.number === null) {
+        player.score = Math.max(0, player.score - 2);
+        player.consecutiveWins = 0;
+      }
+    });
+  }
+
   resetRound() {
+    if (this.roundTimer) {
+      clearTimeout(this.roundTimer);
+      this.roundTimer = null;
+    }
+    if (this.betweenRoundTimer) {
+      clearTimeout(this.betweenRoundTimer);
+      this.betweenRoundTimer = null;
+    }
     this.players.forEach(player => {
       player.number = null;
       player.ready = false;
@@ -224,11 +245,32 @@ class Game {
     this.roundInProgress = false;
   }
 
+  resetGame() {
+    if (this.roundTimer) {
+      clearTimeout(this.roundTimer);
+      this.roundTimer = null;
+    }
+    if (this.betweenRoundTimer) {
+      clearTimeout(this.betweenRoundTimer);
+      this.betweenRoundTimer = null;
+    }
+    this.players.clear();
+    this.roundInProgress = false;
+    this.currentRound = 0;
+    this.roundTime = ROUND_TIME;
+    this.eliminatedPlayers = 0;
+    this.lastEliminatedCount = 0;
+    this.lastWinner = null;
+    this.gameStarted = false;
+    this.eliminationOrder = [];
+  }
+
   checkGameOver() {
     const eliminated = Array.from(this.players.entries())
       .filter(([_, player]) => player.score <= GAME_OVER_POINTS);
-    
-    eliminated.forEach(([socketId, _]) => {
+
+    eliminated.forEach(([socketId, player]) => {
+      this.eliminationOrder.push({ id: socketId, name: player.name, round: this.currentRound });
       this.players.delete(socketId);
     });
 
@@ -251,6 +293,76 @@ class Game {
 
 const game = new Game();
 
+function startRound() {
+  if (game.betweenRoundTimer) {
+    clearTimeout(game.betweenRoundTimer);
+    game.betweenRoundTimer = null;
+  }
+  game.roundInProgress = true;
+  game.currentRound++;
+  game.roundTime = game.shouldUseNewRuleTime() ? NEW_RULE_TIME : ROUND_TIME;
+  game.players.forEach(player => {
+    player.ready = false;
+    player.number = null;
+  });
+  io.emit('roundStart', {
+    round: game.currentRound,
+    time: game.roundTime,
+    players: game.players.size,
+    newRuleIntroduced: game.shouldUseNewRuleTime()
+  });
+  game.roundTimer = setTimeout(endRound, game.roundTime);
+}
+
+function endRound() {
+  if (!game.roundInProgress) return;
+
+  if (game.roundTimer) {
+    clearTimeout(game.roundTimer);
+    game.roundTimer = null;
+  }
+
+  game.penalizeNonSubmitters();
+  const winner = game.calculateWinner();
+  const { eliminated, newRuleIntroduced, gameOver } = game.checkGameOver();
+
+  game.roundInProgress = false;
+
+  io.emit('roundEnd', {
+    winner,
+    gameOverPlayers: eliminated,
+    players: Array.from(game.players.entries()),
+    round: game.currentRound,
+    newRuleIntroduced,
+    gameOver,
+    nextRoundIn: gameOver ? null : BETWEEN_ROUND_TIME
+  });
+
+  if (gameOver) {
+    const remaining = Array.from(game.players.entries())[0];
+    const rankings = [];
+    if (remaining) {
+      rankings.push({ name: remaining[1].name, place: 1, round: game.currentRound });
+    }
+    for (let i = game.eliminationOrder.length - 1; i >= 0; i--) {
+      const entry = game.eliminationOrder[i];
+      rankings.push({ name: entry.name, place: rankings.length + 1, round: entry.round });
+    }
+    io.emit('gameOver', {
+      winner: remaining ? { id: remaining[0], name: remaining[1].name } : null,
+      rankings
+    });
+    game.resetGame();
+    return;
+  }
+
+  game.players.forEach(player => {
+    player.number = null;
+    player.ready = false;
+  });
+  game.betweenRoundTimer = setTimeout(startRound, BETWEEN_ROUND_TIME);
+}
+
 io.on('connection', (socket) => {
   console.log('New client connected');
 
@@ -268,18 +380,11 @@ io.on('connection', (socket) => {
     const player = game.players.get(socket.id);
     if (player) {
       player.ready = true;
+      io.emit('playerList', Array.from(game.players.entries()));
       const allReady = Array.from(game.players.values()).every(p => p.ready);
-      if (allReady && game.players.size >= 2) {
+      if (allReady && game.players.size >= 2 && !game.roundInProgress) {
         game.gameStarted = true;
-        game.roundInProgress = true;
-        game.currentRound++;
-        game.roundTime = game.shouldUseNewRuleTime() ? NEW_RULE_TIME : ROUND_TIME;
-        io.emit('roundStart', {
-          round: game.currentRound,
-          time: game.roundTime,
-          players: game.players.size,
-          newRuleIntroduced: game.shouldUseNewRuleTime()
-        });
+        startRound();
       }
     }
   });
@@ -288,28 +393,9 @@ io.on('connection', (socket) => {
     if (game.roundInProgress) {
       game.setPlayerNumber(socket.id, number);
       const allSubmitted = Array.from(game.players.values()).every(p => p.number !== null);
-      
+
       if (allSubmitted) {
-        const winner = game.calculateWinner();
-        const { eliminated, newRuleIntroduced, gameOver } = game.checkGameOver();
-        
-        io.emit('roundEnd', {
-          winner,
-          gameOverPlayers: eliminated,
-          players: Array.from(game.players.entries()),
-          round: game.currentRound,
-          newRuleIntroduced,
-          gameOver
-        });
-
-        if (gameOver) {
-          const winner = Array.from(game.players.entries())[0];
-          io.emit('gameOver', {
-            winner: winner ? { id: winner[0], name: winner[1].name } : null
-          });
-        }
-
-        game.resetRound();
+        endRound();
       }
     }
   });
@@ -317,6 +403,23 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     game.removePlayer(socket.id);
     io.emit('playerList', Array.from(game.players.entries()));
+
+    if (game.gameStarted && game.players.size <= 1) {
+      const remaining = Array.from(game.players.entries())[0];
+      const rankings = [];
+      if (remaining) {
+        rankings.push({ name: remaining[1].name, place: 1, round: game.currentRound });
+      }
+      for (let i = game.eliminationOrder.length - 1; i >= 0; i--) {
+        const entry = game.eliminationOrder[i];
+        rankings.push({ name: entry.name, place: rankings.length + 1, round: entry.round });
+      }
+      io.emit('gameOver', {
+        winner: remaining ? { id: remaining[0], name: remaining[1].name } : null,
+        rankings
+      });
+      game.resetGame();
+    }
   });
 });
 
@@ -334,10 +437,10 @@ app.get('*', (req, res) => {
 });
 
 // For Vercel serverless deployment
-if (process.env.NODE_ENV === 'production') {
+if (process.env.VERCEL) {
   module.exports = app;
 } else {
-  const PORT = process.env.PORT || 8080;
+  const PORT = process.env.PORT || 9080;
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
   });
