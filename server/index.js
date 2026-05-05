@@ -30,9 +30,15 @@ const BETWEEN_ROUND_TIME = 60000; // 1 minute between rounds
 const GAME_OVER_POINTS = 0;
 const INITIAL_SCORE = 10;
 
+const CHARACTER_IDS = [
+  'wizard', 'robot', 'ninja', 'knight', 'fox',
+  'witch', 'pirate', 'astronaut', 'samurai', 'dragon'
+];
+
 class Game {
   constructor() {
     this.players = new Map();
+    this.spectators = new Map();
     this.roundInProgress = false;
     this.currentRound = 0;
     this.roundTime = ROUND_TIME;
@@ -43,6 +49,32 @@ class Game {
     this.roundTimer = null;
     this.betweenRoundTimer = null;
     this.eliminationOrder = [];
+  }
+
+  takenCharacters() {
+    return new Set(
+      Array.from(this.players.values())
+        .map(p => p.character)
+        .filter(Boolean)
+    );
+  }
+
+  pickAvailableCharacter() {
+    const taken = this.takenCharacters();
+    return CHARACTER_IDS.find(id => !taken.has(id)) || null;
+  }
+
+  setCharacter(socketId, character) {
+    const player = this.players.get(socketId);
+    if (!player) return { success: false, message: 'Player not found' };
+    if (!CHARACTER_IDS.includes(character)) {
+      return { success: false, message: 'Invalid character' };
+    }
+    if (this.takenCharacters().has(character) && player.character !== character) {
+      return { success: false, message: 'Character already taken' };
+    }
+    player.character = character;
+    return { success: true };
   }
 
   isUsernameTaken(username) {
@@ -66,9 +98,20 @@ class Game {
       score: INITIAL_SCORE,
       number: null,
       ready: false,
-      consecutiveWins: 0
+      consecutiveWins: 0,
+      character: this.pickAvailableCharacter(),
+      hasSubmitted: false
     });
     return { success: true };
+  }
+
+  addSpectator(socketId, name) {
+    this.spectators.set(socketId, { name: name || 'Spectator' });
+    return { success: true };
+  }
+
+  removeSpectator(socketId) {
+    this.spectators.delete(socketId);
   }
 
   removePlayer(socketId) {
@@ -79,6 +122,7 @@ class Game {
     const player = this.players.get(socketId);
     if (player) {
       player.number = number;
+      player.hasSubmitted = true;
     }
   }
 
@@ -241,6 +285,7 @@ class Game {
     this.players.forEach(player => {
       player.number = null;
       player.ready = false;
+      player.hasSubmitted = false;
     });
     this.roundInProgress = false;
   }
@@ -304,6 +349,7 @@ function startRound() {
   game.players.forEach(player => {
     player.ready = false;
     player.number = null;
+    player.hasSubmitted = false;
   });
   io.emit('roundStart', {
     round: game.currentRound,
@@ -359,6 +405,7 @@ function endRound() {
   game.players.forEach(player => {
     player.number = null;
     player.ready = false;
+    player.hasSubmitted = false;
   });
   game.betweenRoundTimer = setTimeout(startRound, BETWEEN_ROUND_TIME);
 }
@@ -367,12 +414,59 @@ io.on('connection', (socket) => {
   console.log('New client connected');
 
   socket.on('join', (playerName) => {
+    if (game.spectators.has(socket.id)) {
+      game.removeSpectator(socket.id);
+    }
     const result = game.addPlayer(socket.id, playerName);
     if (result.success) {
-      socket.emit('joinSuccess');
+      const player = game.players.get(socket.id);
+      socket.emit('joinSuccess', { character: player.character });
       io.emit('playerList', Array.from(game.players.entries()));
     } else {
       socket.emit('joinError', result.message);
+    }
+  });
+
+  socket.on('joinAsSpectator', (name) => {
+    const wasPlayer = game.players.has(socket.id);
+    if (wasPlayer) {
+      game.removePlayer(socket.id);
+    }
+    game.addSpectator(socket.id, name);
+    if (wasPlayer) {
+      io.emit('playerList', Array.from(game.players.entries()));
+      // If this drop pushes the game to <= 1 alive player mid-match, end it.
+      if (game.gameStarted && game.players.size <= 1) {
+        const remaining = Array.from(game.players.entries())[0];
+        const rankings = [];
+        if (remaining) {
+          rankings.push({ name: remaining[1].name, place: 1, round: game.currentRound });
+        }
+        for (let i = game.eliminationOrder.length - 1; i >= 0; i--) {
+          const entry = game.eliminationOrder[i];
+          rankings.push({ name: entry.name, place: rankings.length + 1, round: entry.round });
+        }
+        io.emit('gameOver', {
+          winner: remaining ? { id: remaining[0], name: remaining[1].name } : null,
+          rankings
+        });
+        game.resetGame();
+      }
+    }
+    socket.emit('spectatorJoined', {
+      players: Array.from(game.players.entries()),
+      gameStarted: game.gameStarted,
+      roundInProgress: game.roundInProgress,
+      currentRound: game.currentRound
+    });
+  });
+
+  socket.on('selectCharacter', (character) => {
+    const result = game.setCharacter(socket.id, character);
+    if (result.success) {
+      io.emit('playerList', Array.from(game.players.entries()));
+    } else {
+      socket.emit('characterError', result.message);
     }
   });
 
@@ -392,6 +486,14 @@ io.on('connection', (socket) => {
   socket.on('submitNumber', (number) => {
     if (game.roundInProgress) {
       game.setPlayerNumber(socket.id, number);
+      const player = game.players.get(socket.id);
+      if (player) {
+        io.emit('playerSubmitted', {
+          id: socket.id,
+          name: player.name,
+          character: player.character
+        });
+      }
       const allSubmitted = Array.from(game.players.values()).every(p => p.number !== null);
 
       if (allSubmitted) {
@@ -401,6 +503,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    if (game.spectators.has(socket.id)) {
+      game.removeSpectator(socket.id);
+      return;
+    }
     game.removePlayer(socket.id);
     io.emit('playerList', Array.from(game.players.entries()));
 
