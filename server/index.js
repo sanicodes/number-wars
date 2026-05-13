@@ -370,12 +370,24 @@ function endRound() {
 
   game.penalizeNonSubmitters();
   const winner = game.calculateWinner();
+  const roundPlayers = Array.from(game.players.entries());
+  const winnerPlayer = winner
+    ? roundPlayers.find(([socketId]) => socketId === winner)?.[1]
+    : null;
+  const defeatedPlayers = winner
+    ? roundPlayers
+        .map(([socketId]) => (socketId !== winner ? socketId : null))
+        .filter(Boolean)
+    : [];
   const { eliminated, newRuleIntroduced, gameOver } = game.checkGameOver();
 
   game.roundInProgress = false;
 
   io.emit('roundEnd', {
     winner,
+    winnerName: winnerPlayer ? winnerPlayer.name : null,
+    roundPlayers,
+    defeatedPlayers,
     gameOverPlayers: eliminated,
     players: Array.from(game.players.entries()),
     round: game.currentRound,
