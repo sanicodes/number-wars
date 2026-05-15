@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -32,6 +33,7 @@ const STATUS_COPY = {
 };
 
 export default function PlayerView() {
+  const navigate = useNavigate();
   const [playerName, setPlayerName] = useState('');
   const [gameState, setGameState] = useState('joining');
   const [players, setPlayers] = useState([]);
@@ -91,7 +93,11 @@ export default function PlayerView() {
       setRoundInfo(null);
       setRoundResults(data);
       setPlayers(data.players);
-      if (data.gameOverPlayers.includes(socket.id)) setGameOver(true);
+      if (data.gameOverPlayers.includes(socket.id)) {
+        setGameOver(true);
+        navigate('/spectate');
+        return;
+      }
       if (data.nextRoundIn) setNextRoundCountdown(data.nextRoundIn / 1000);
 
       const resultPlayers = data.roundPlayers || data.players;
@@ -139,7 +145,7 @@ export default function PlayerView() {
       socket.off('gameOver', onGameOver);
       socket.off('playerSubmitted', onPlayerSubmitted);
     };
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     let timer;

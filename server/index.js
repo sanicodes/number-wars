@@ -316,6 +316,7 @@ class Game {
 
     eliminated.forEach(([socketId, player]) => {
       this.eliminationOrder.push({ id: socketId, name: player.name, round: this.currentRound });
+      this.spectators.set(socketId, { name: player.name });
       this.players.delete(socketId);
     });
 
